@@ -1,5 +1,11 @@
+package dpqs;
 import java.util.Random;
 
+/*
+ * This class is used for randomizing a set of 20 processes
+ * An instance of this class should never be made, and all functions shall be static
+ * a private processList is kept for use in debugging using displayProcesses()
+ */
 public class Randomizer {
     static private Process[] processList;
     
@@ -36,23 +42,5 @@ public class Randomizer {
                                  " | IO Time : " + i.IOTime);
         }
         
-    }
-
-    
-    public static void main(String[] args) {
-       // Randomizer dpqs = new Randomizer();
-        
-        
-      //  dpqs.Randomize();
-        
-        
-        System.out.println("Generated Processes:");
-       // dpqs.displayProcesses();
-        
-        
-        //System.out.println("\nBurst Times Array:");
-        //for (int i = 0; i < burstTimes.length; i++) {
-        //    System.out.println("Index " + i + ": " + burstTimes[i]);
-        //}
     }
 }
