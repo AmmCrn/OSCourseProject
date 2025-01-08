@@ -37,7 +37,7 @@ public class cpusched {
         inputPanel.add(clearGanttButton);  // Add the clear button to the panel
 
         // Table with Process Name, Priority, and Burst Time columns
-        String[] columnNames = {"Process Name", "Priority", "Burst Time"};
+        String[] columnNames = {"Process Name", "Priority", "Burst Time", "Quantum"};
         tableModel = new DefaultTableModel(columnNames, 0);
         processTable = new JTable(tableModel);
         JScrollPane scrollPane = new JScrollPane(processTable);
@@ -110,18 +110,24 @@ public class cpusched {
                 tableModel.setRowCount(0);
                 ganttChartPanel.removeAll();  // Clear Gantt chart
                 ganttChartPanel.revalidate();  // Refresh Gantt chart display
+                Scheduler prc = new Scheduler();
+                Randomizer.displayProcesses();
+                int length = prc.processList.length;
                 
-                for (int i = 1; i <= 20; i++) {
+                for (int i = 0; i < length  ; i++) {
                     String processName = "P" + i;
-                    int priority = (int) (Math.random() * 10) + 1; // Random priority
-                    int burstTime = (int) (Math.random() * 10) + 1; // Random burst time
-                    tableModel.addRow(new Object[]{processName, priority, burstTime});
+                    int priority = prc.processList[i].priority; 
+                    int burstTime = prc.processList[i].burstTime; 
+                    float quantum = prc.processList[i].defquantum;
+                    tableModel.addRow(new Object[]{processName, priority, burstTime,quantum});
                 }
+                
 
                 // Clear the "Next in Queue" field after resetting the processes
                 nextInQDisplay.setText("None");
             }
         });
+        
 
         // Add action listener to Clear Gantt Chart button
         clearGanttButton.addActionListener(new ActionListener() {
@@ -138,11 +144,14 @@ public class cpusched {
             @Override
             public void valueChanged(ListSelectionEvent event) {
                 int selectedRow = processTable.getSelectedRow();
+                
+                
                 if (selectedRow != -1) {
                     // Update fields with selected process data
                     burstTimeField.setText(tableModel.getValueAt(selectedRow, 2).toString());
                     priorityField.setText(tableModel.getValueAt(selectedRow, 1).toString());
                     currProcDisplay.setText(tableModel.getValueAt(selectedRow, 0).toString());
+                    quantumField.setText(tableModel.getValueAt(selectedRow, 3).toString()); //TODO
                 }
             }
         });
@@ -221,9 +230,9 @@ public class cpusched {
                             highestPriority = priority;
                             highestPriorityRow = i;
                         }
-                    }
+                    }// TODO rmove loop nad ig call the priority function in the scheduler file
         
-                    // Get the process details
+                    // Get the process details            
                     String processName = (String) tableModel.getValueAt(highestPriorityRow, 0);
                     int burstTime = Integer.parseInt(tableModel.getValueAt(highestPriorityRow, 2).toString());
         
@@ -273,6 +282,7 @@ public class cpusched {
         frame.setVisible(true);
     }
 
+    
     public static void main(String[] args) {
         SwingUtilities.invokeLater(cpusched::new);
     }
