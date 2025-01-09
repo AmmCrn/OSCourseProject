@@ -6,15 +6,79 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
-public class cpusched {
+public class GUI {
     private JFrame frame;
     private JTable processTable;
     private DefaultTableModel tableModel;
     private JTextField burstTimeField, quantumField, priorityField, finishTimeField;
     private JTextField currProcDisplay, nextInQDisplay;
     private JPanel ganttChartPanel;
+    private JLabel lastBlockInChartRef = null;
+    Bridge BRDG = new Bridge();
 
-    public cpusched() {
+    private void nextStep(){
+        if (tableModel.getRowCount() > 0) {
+            BRDG.NextCycle();
+
+            Process nextPRC = BRDG.getNextProcess();// TODO rmove loop nad ig call the priority function in the scheduler file
+            Process current = BRDG.getCurrentProcess();
+
+            // if there is a new process added to the gantt chart add it to it
+            if(current != null && lastBlockInChartRef != null
+             && !lastBlockInChartRef.getText().equals("P" + current.processId)){
+
+                // Get the process details            
+                String processName = "P" + current.processId;
+                int burstTime = current.burstTime;
+    
+                // Add the process to the Gantt chart
+                JLabel processBlock = new JLabel(processName + " (" + burstTime + ")");
+                processBlock.setOpaque(true);
+                processBlock.setBackground(Color.CYAN);
+                processBlock.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                lastBlockInChartRef = processBlock;
+                ganttChartPanel.add(processBlock);
+                ganttChartPanel.revalidate();
+            }
+
+            if (current != null && lastBlockInChartRef == null) {
+                // Get the process details            
+                String processName = "P" + current.processId;
+                int burstTime = current.burstTime;
+    
+                // Add the process to the Gantt chart
+                JLabel processBlock = new JLabel(processName + " (" + burstTime + ")");
+                processBlock.setOpaque(true);
+                processBlock.setBackground(Color.CYAN);
+                processBlock.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                lastBlockInChartRef = processBlock;
+                ganttChartPanel.add(processBlock);
+                ganttChartPanel.revalidate();
+            }
+
+            // Update "Currently Running"
+            currProcDisplay.setText(current == null ? "None" : ("P" + current.processId));
+            nextInQDisplay.setText(nextPRC == null ? "None" : ("P" + nextPRC.processId));
+
+            Process[] PRCList = BRDG.getProcessList();
+            int rowCount = tableModel.getRowCount();
+            for (int i = 0; i < rowCount; i++) {
+                tableModel.removeRow(0);
+            }
+            
+            for (int i = 0; i < BRDG.processLength ; i++) {
+                String processName = "P" + i;
+                int priority = PRCList[i].priority; 
+                int burstTime = PRCList[i].burstTime; 
+                double quantum = PRCList[i].quantum;
+                int arrivalTime = PRCList[i].arrivalTime;
+                String IsFinished = BRDG.isFinished(i);
+                tableModel.addRow(new Object[]{processName, priority, burstTime,quantum, arrivalTime, IsFinished});
+            }
+        }
+    }
+
+    public GUI() {
         // Main frame
         frame = new JFrame("CPU Scheduler");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -37,12 +101,13 @@ public class cpusched {
         inputPanel.add(clearGanttButton);  // Add the clear button to the panel
 
         // Table with Process Name, Priority, and Burst Time columns
-        String[] columnNames = {"Process Name", "Priority", "Burst Time", "Quantum"};
+        String[] columnNames = {"Process Name", "Priority", "Burst Time", "Quantum", "Arrival time", "Is Finished"};
         tableModel = new DefaultTableModel(columnNames, 0);
         processTable = new JTable(tableModel);
         JScrollPane scrollPane = new JScrollPane(processTable);
 
-        // Panel for process attributes
+        // Panel for process attributeselds;
+
         JPanel attributePanel = new JPanel();
         attributePanel.setLayout(new GridLayout(5, 2));
 
@@ -91,7 +156,7 @@ public class cpusched {
         centerPanel.add(scrollPane, BorderLayout.CENTER);
         centerPanel.add(eastSubPanel, BorderLayout.EAST);
 
-        // Gantt chart panel
+
         ganttChartPanel = new JPanel();
         ganttChartPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         ganttChartPanel.setBorder(BorderFactory.createTitledBorder("Gantt Chart"));
@@ -110,18 +175,18 @@ public class cpusched {
                 tableModel.setRowCount(0);
                 ganttChartPanel.removeAll();  // Clear Gantt chart
                 ganttChartPanel.revalidate();  // Refresh Gantt chart display
-                Scheduler prc = new Scheduler();
+                ganttChartPanel.repaint();
+                
+                Process[] PRCList = BRDG.generateProcesses();
                 Randomizer.displayProcesses();
-                int length = prc.processList.length;
-                
-                for (int i = 0; i < length  ; i++) {
+                for (int i = 0; i < BRDG.processLength ; i++) {
                     String processName = "P" + i;
-                    int priority = prc.processList[i].priority; 
-                    int burstTime = prc.processList[i].burstTime; 
-                    float quantum = prc.processList[i].defquantum;
-                    tableModel.addRow(new Object[]{processName, priority, burstTime,quantum});
+                    int priority = PRCList[i].priority; 
+                    int burstTime = PRCList[i].burstTime; 
+                    float quantum = PRCList[i].defquantum;
+                    int arrivalTime = PRCList[i].arrivalTime;
+                    tableModel.addRow(new Object[]{processName, priority, burstTime,quantum, arrivalTime});
                 }
-                
 
                 // Clear the "Next in Queue" field after resetting the processes
                 nextInQDisplay.setText("None");
@@ -136,6 +201,7 @@ public class cpusched {
                 // Clear the Gantt chart whenever the "Clear Gantt Chart" button is clicked
                 ganttChartPanel.removeAll();
                 ganttChartPanel.revalidate();  // Refresh the Gantt chart display
+                ganttChartPanel.repaint();
             }
         });
 
@@ -145,13 +211,12 @@ public class cpusched {
             public void valueChanged(ListSelectionEvent event) {
                 int selectedRow = processTable.getSelectedRow();
                 
-                
                 if (selectedRow != -1) {
                     // Update fields with selected process data
                     burstTimeField.setText(tableModel.getValueAt(selectedRow, 2).toString());
                     priorityField.setText(tableModel.getValueAt(selectedRow, 1).toString());
-                    currProcDisplay.setText(tableModel.getValueAt(selectedRow, 0).toString());
-                    quantumField.setText(tableModel.getValueAt(selectedRow, 3).toString()); //TODO
+                    quantumField.setText(tableModel.getValueAt(selectedRow, 3).toString());
+                    finishTimeField.setText(BRDG.getFinishTime(selectedRow));
                 }
             }
         });
@@ -159,58 +224,11 @@ public class cpusched {
         finishCycleButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if(BRDG.getProcessList() == null)
+                    return;
                 // Loop until all processes are executed
-                while (tableModel.getRowCount() > 0) {
-                    // Find the process with the highest priority (lowest number)
-                    int highestPriorityRow = -1;
-                    int highestPriority = Integer.MAX_VALUE;
-        
-                    // Loop to find the highest priority process
-                    for (int i = 0; i < tableModel.getRowCount(); i++) {
-                        int priority = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
-                        if (priority < highestPriority) {
-                            highestPriority = priority;
-                            highestPriorityRow = i;
-                        }
-                    }
-        
-                    // Get the process details
-                    String processName = (String) tableModel.getValueAt(highestPriorityRow, 0);
-                    int burstTime = Integer.parseInt(tableModel.getValueAt(highestPriorityRow, 2).toString());
-        
-                    // Add the process to the Gantt chart
-                    JLabel processBlock = new JLabel(processName + " (" + burstTime + ")");
-                    processBlock.setOpaque(true);
-                    processBlock.setBackground(Color.CYAN);
-                    processBlock.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                    ganttChartPanel.add(processBlock);
-                    ganttChartPanel.revalidate();
-        
-                    // Update "Currently Running"
-                    currProcDisplay.setText(processName);
-        
-                    // Remove the process from the table after execution
-                    tableModel.removeRow(highestPriorityRow);
-        
-                    // Update the "Next in Queue" based on the highest priority of remaining processes
-                    if (tableModel.getRowCount() > 0) {
-                        int nextHighestPriority = Integer.MAX_VALUE;
-                        int nextHighestPriorityRow = -1;
-        
-                        // Find the process with the next highest priority
-                        for (int i = 0; i < tableModel.getRowCount(); i++) {
-                            int priority = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
-                            if (priority < nextHighestPriority) {
-                                nextHighestPriority = priority;
-                                nextHighestPriorityRow = i;
-                            }
-                        }
-        
-                        String nextProcessName = (String) tableModel.getValueAt(nextHighestPriorityRow, 0);
-                        nextInQDisplay.setText(nextProcessName);
-                    } else {
-                        nextInQDisplay.setText("None");
-                    }
+                while(!BRDG.scheduleFinished()){
+                    nextStep();
                 }
             }
         });
@@ -218,58 +236,7 @@ public class cpusched {
         nextStepButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (tableModel.getRowCount() > 0) {
-                    // Find the process with the highest priority (lowest number)
-                    int highestPriorityRow = -1;
-                    int highestPriority = Integer.MAX_VALUE;
-                    
-                    // Loop to find the highest priority process
-                    for (int i = 0; i < tableModel.getRowCount(); i++) {
-                        int priority = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
-                        if (priority < highestPriority) {
-                            highestPriority = priority;
-                            highestPriorityRow = i;
-                        }
-                    }// TODO rmove loop nad ig call the priority function in the scheduler file
-        
-                    // Get the process details            
-                    String processName = (String) tableModel.getValueAt(highestPriorityRow, 0);
-                    int burstTime = Integer.parseInt(tableModel.getValueAt(highestPriorityRow, 2).toString());
-        
-                    // Add the process to the Gantt chart
-                    JLabel processBlock = new JLabel(processName + " (" + burstTime + ")");
-                    processBlock.setOpaque(true);
-                    processBlock.setBackground(Color.CYAN);
-                    processBlock.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                    ganttChartPanel.add(processBlock);
-                    ganttChartPanel.revalidate();
-        
-                    // Update "Currently Running"
-                    currProcDisplay.setText(processName);
-                    
-                    // Remove the process from the table after execution
-                    tableModel.removeRow(highestPriorityRow);
-        
-                    // Update the "Next in Queue" based on the highest priority of remaining processes
-                    if (tableModel.getRowCount() > 0) {
-                        int nextHighestPriority = Integer.MAX_VALUE;
-                        int nextHighestPriorityRow = -1;
-                        
-                        // Find the process with the next highest priority
-                        for (int i = 0; i < tableModel.getRowCount(); i++) {
-                            int priority = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
-                            if (priority < nextHighestPriority) {
-                                nextHighestPriority = priority;
-                                nextHighestPriorityRow = i;
-                            }
-                        }
-        
-                        String nextProcessName = (String) tableModel.getValueAt(nextHighestPriorityRow, 0);
-                        nextInQDisplay.setText(nextProcessName);
-                    } else {
-                        nextInQDisplay.setText("None");
-                    }
-                }
+                nextStep();
             }
         });
 
@@ -282,8 +249,4 @@ public class cpusched {
         frame.setVisible(true);
     }
 
-    
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(cpusched::new);
-    }
 }

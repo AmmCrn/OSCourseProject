@@ -29,9 +29,9 @@ public class Scheduler {
                 size++;
         }
         readyQueueSize = size;
-        printQueue();
-        System.out.println("Ready queue size: " + readyQueueSize); 
-        // readyQueueSize--;
+        //printQueue();
+        //System.out.println("Ready queue size: " + readyQueueSize); 
+        
     }
 
     // constructor, set all readyQueue indexes to empty and generate random processes
@@ -46,8 +46,12 @@ public class Scheduler {
     // priority calculation function as denoted in project proposal
     public void calculatePriority(int PID){
         //Priority = Base Priority + (Waiting Time / Total Time) + I/O Factor
-        int priority = processList[PID].priority + processList[PID].priority + ((int) (processList[PID].WaitingTime / processList[PID].TotalTime)) + processList[PID].IOTime;
-        processList[PID].priority = priority;
+        Process p = processList[PID];
+        if (p.finished) {
+            return;
+        }
+        int priority = p.defPriority + Math.round(p.WaitingTime / p.TotalTime) + (p.IOTime / p.burstTime);
+        p.priority = priority;
     }
 
     /*
@@ -65,19 +69,19 @@ public class Scheduler {
      * Aging function to prevent starvation, should be run on all processes in the readyQueue
      * if a process has been in the readyqueue for a laaarge amount of time, make sure it's priority is bumped
      */
-    public void AgeProcess(Process prc){
+    public void ageProcess(Process prc){
         //quatum expires and process gets aged
-        if (prc.WaitingTime > prc.defquantum*30) {
+        if (prc.WaitingTime > prc.defquantum*15 && prc.priority > 1) {
             prc.priority--;
         }
     }
 
-    // debug function, delete later
-    void printQueue(){
-        for(int i : readyQueue)
-            System.out.print(i + ", ");
-            System.out.println();
-    }
+    // // debug function, delete later
+    // void printQueue(){
+    //     for(int i : readyQueue)
+    //         System.out.print(i + ", ");
+    //         System.out.println();
+    // }
 
     /*
      * Switch current process for next one in queue with the highest priority (lowest int)
@@ -104,32 +108,77 @@ public class Scheduler {
         return processList[next_PID];
     }
 
-    public void NextCycle(){
+    private Process preempt(){
+        if(current == null)
+            return null;
+
+        int next_PID = current.processId;
+        int index = -1;
+        Process newProcess = current;
+        for(int i = 0; i < readyQueueSize; i++){
+            if(processList[readyQueue[i]].priority < processList[next_PID].priority){
+                next_PID = readyQueue[i];
+                index = i;
+            }
+        }
+
+        if (index != -1) {
+            // switch out processes;
+            newProcess = processList[next_PID];
+            readyQueue[index] = -1;
+            updateQueue();
+            readyQueue[readyQueueSize++] = current.processId;
+            calculatePriority(current.processId);
+            calculateQuantum(current.processId, current.processId);
+        }
+
+        return newProcess;
+    }
+
+    public boolean allFinished(){
+        for (int i = 0; i < processList.length; i++) {
+            if(!processList[i].finished)
+                return false;
+        }
+        return true;
+    }
+
+    public void nextCycle(){
+        if(allFinished()) return;
+
         // when a process arrives, send it to the ready queue
         for (int i = 0; i < processList.length; i++) {
             if(processList[i].arrivalTime == time){
                 readyQueue[readyQueueSize++] = i;
-                updateQueue();//TODO REMINDER--in the simulation this might have to be a readyq
-                printQueue();
+                updateQueue();
+                //printQueue();
             }
         }
+
+        current = preempt();
         
-        // a milisecond of time has passed TODO: consider a loop going at 0.01ms, i.e. 100 times
+        // a milisecond of time has passed 
         time++;
+
+        // Increase waitingTime for all processes waiting in Queue;
+        for (int i = 0; i < readyQueueSize; i++) {
+            Process p = processList[readyQueue[i]];
+            p.WaitingTime++;
+            p.TotalTime++;
+            ageProcess(processList[readyQueue[i]]);
+        }
 
         // if no process currently running; get new one from the readyQueue
         if(current == null) {
         	current = contextSwitch(); // will return null if queue is empty
         	if(current == null) return; // if the current process is still null, there is no work being done
-            /* old code, could be more useful?
-             * if(readyQueue[0] != -1)
-                current = contextSwitch(current);
-                else return;
-                */
+            
         }
-        System.out.println("QUANTUM RN "+ current.processId +" is " +current.quantum);
+        
         current.runTime += 1; // 1ms of runtime done
+        current.TotalTime++;
         current.quantum -= 1; // 1ms less of quantum remaining
+        current.WaitingTime = 0;
 
         // check if the process is finished by seeing if the runtime is larger than it's bursttime
         
@@ -170,11 +219,5 @@ public class Scheduler {
         System.out.println("[" + time + "] Quantum left for " + (current.processId+1) + ": " + current.quantum);
     }
 
-    public static void main(String[] args) {
-        Scheduler scheduler = new Scheduler();
-        Randomizer.displayProcesses();
-        for (int i = 0; i < 50; i++) {
-            scheduler.NextCycle();
-        }
-    }
+    
 }

@@ -18,7 +18,8 @@ public class Randomizer {
             
             process.processId = i;  // Sequential ID starting from ~1~ ZERO!!!!!!!!!!
             process.burstTime = rnd.nextInt(20) + 1;  // Random burst time 1-20
-            process.priority = rnd.nextInt(5) + 1;    // Random priority 1-5
+            process.defPriority = rnd.nextInt(5) + 1;    // Random priority 1-5
+            process.priority = process.defPriority;
             process.defquantum = rnd.nextFloat() * 10;  // Random quantum 0-10
             process.quantum = process.defquantum;
             process.arrivalTime = rnd.nextInt(30); // Random arrival
